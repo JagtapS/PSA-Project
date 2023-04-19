@@ -13,8 +13,9 @@ import java.util.PriorityQueue;
 import java.util.Set;
 
 public class Graph implements Serializable {
-    List<Node> nodes;
-    List<Edge> edges;
+    public List<Node> nodes;
+    public List<Edge> edges;
+    
 
     public Graph() {
         this.nodes = new ArrayList<>();
@@ -25,7 +26,13 @@ public class Graph implements Serializable {
         this.nodes = nodes;
         this.edges = new ArrayList<>();
     }
+    public int getDegree(Node node) {
+        return edges.size();
+    }
 
+//    public int getDegree(Node node) {
+//        return node.getDegree();
+//    }
     public void addNode(Node node) {
         nodes.add(node);
     }
@@ -95,12 +102,11 @@ public class Graph implements Serializable {
                 parents.put(parent1, parent2);
             }
         }
+
         return mst; //mst list
     }
 
-    
-    
-    //    
+//    
 //    public List<Edge> primMST() {
 //        List<Edge> mst = new ArrayList<>();
 //        Set<Node> visited = new HashSet<>();
@@ -293,9 +299,3 @@ public class Graph implements Serializable {
     }
 
 }
-
-
-
-
-
-

@@ -5,21 +5,199 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.stream.Collectors;
-
-import com.psa.model.AntColonyOptimization;
 import com.psa.model.Christofides;
 import com.psa.model.Edge;
 import com.psa.model.Graph;
 import com.psa.model.Node;
-//import com.psa.model.Population;
-//import com.psa.model.TSPGeneticAlgorithm;
-import com.psa.model.Vertex;
+
+import main.java.FileIO;
+import main.java.Tour;
+import main.java.Town;
 
 public class App {
+	public static final double BETA = 2.0;
+	public static final double PO = 0.1;
+	public static double Q_0;
+	public static int T_MAX;
+	public static int cl = 15;
+	public static Town[] towns;
+	public static int n;
+	public static final int m = 15;
+	public static double TAU_0;
+	public static double THRESH = 0.000001;
+
+	public static double[][] adjacencyMatrix;
+	public static double[][] pheromone;
+	public static double dist = 0;
+
+	
+	
+	
+	
+	
+	
     public static void main(String[] args) {
         System.out.println(System.getProperty("user.dir"));
         createGraph();
+        
+        
+        // Ant Colony Optimization
+        
+    	FileIO reader = new FileIO();
+		String name = "PSADatasets.csv";
+		Q_0 = 0.8;
+		T_MAX = 10000;
+
+		String[] twns = reader.load(name);
+
+		n = twns.length;
+
+		towns = new Town[n];
+
+		for (int i = 0; i < n; i++) {
+			String[] parts = twns[i].split(",");
+			towns[i] = new Town(Integer.parseInt(parts[0]), parts[1], Double.parseDouble(parts[2]),
+					Double.parseDouble(parts[3]));
+		}
+
+		adjacencyMatrix = new double[n][n];
+		pheromone = new double[n][n];
+
+		// fill the adjacency matrix
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				if (i != j) {
+					adjacencyMatrix[i][j] = towns[i].distanceTo(towns[j]);
+				} else
+					adjacencyMatrix[i][j] = 0.0;
+			}
+		}
+
+		// a pretty good tour to start with
+		Tour nn = Tour.nearestNeighbour();
+
+		double shortest = nn.distance;
+		double secondBest = Double.MAX_VALUE;
+
+		Tour globalBest = nn;
+		double globalShortest = shortest;
+
+		Tour best = nn;
+		Tour second = nn;
+		TAU_0 = Math.pow(n * nn.distance, -1);
+		Town[][] candidateLists = new Town[n][cl];
+
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				if (i != j)
+					pheromone[i][j] = TAU_0;
+			}
+			candidateLists[i] = towns[i].candidates();
+		}
+
+		Random gen = new Random();
+
+		for (int t = 0; t < T_MAX; t++) {
+			// all my tours
+			Tour[] t_k = new Tour[m];
+
+			for (int k = 0; k < m; k++) {
+				// all my ants
+
+				// build tour Tkt by applying n-1 times the following steps
+				t_k[k] = new Tour(towns[(int) (Math.random() * n)]);
+
+				for (int i = 0; i < n - 1; i++) {
+
+					Town[] candidates = candidateLists[t_k[k].current().id - 1];
+					Town next;
+
+					if (numUnvisited(t_k[k], candidates) > 0) {
+
+						Town[] unvisited = getUnvisited(t_k[k], candidates);
+
+						double q = gen.nextDouble();
+						;
+
+						try {
+							if (args[3].equals("-r"))
+								q = Math.random();
+						} catch (Exception e) {
+
+						}
+
+						int index;
+
+						if (q <= Q_0)
+							index = maxArg(unvisited, t_k[k].current());
+						else
+							index = probability(unvisited, t_k[k].current()); // probability formula
+
+						next = unvisited[index];
+
+					} else {
+
+						next = t_k[k].nextClosest();
+					}
+
+					applyPheromone(t_k[k].current(), next);
+					t_k[k].visit(next);
+
+				}
+
+				t_k[k].opt3();
+
+//				double dist = 0;
+				// for all my ants see if they produces a better tour
+//				double sum = 0;
+				if (shortest - t_k[k].distance >= THRESH) {
+					shortest = t_k[k].distance;
+					best = t_k[k];
+
+					System.out.println("new best \t" + shortest*1000 + "\t" + t); //distance in meters
+
+				} else if (secondBest - t_k[k].distance >= THRESH) {
+					secondBest = t_k[k].distance;
+					second = t_k[k];
+				}
+//				} else if (t_k[k].distance > longest) {
+//					longest = t_k[k].distance;
+//					Tour worst = t_k[k];
+//
+//				}
+
+			}
+			
+			
+			// update the best 2 tours
+			for (int i = 0; i < n; i++) {
+				int from = best.visited[i].id - 1;
+				int to = best.visited[i + 1].id - 1;
+				double old = pheromone[from][to];
+				pheromone[from][to] = (1 - PO) * old + (PO * (1.0 / shortest));
+				pheromone[to][from] = pheromone[from][to];
+
+				from = second.visited[i].id - 1;
+				to = second.visited[i + 1].id - 1;
+				old = pheromone[from][to];
+				pheromone[from][to] = (1 - PO) * old + (PO * (1.0 / shortest));
+				pheromone[to][from] = pheromone[from][to];
+				
+				
+			} // end update
+			
+		} // end t max
+		dist+=shortest;
+		
+		System.out.println("Ant Colony Optimization Execution: ");
+		System.out.println("Ant Colony Optimization Tour Length: " + dist*1000);
+		System.out.println("values are \n" + best + "\n"); // This is the last line
+		
+        
+        
+        
     }
 
     public static void createGraph() {
@@ -45,14 +223,14 @@ public class App {
         //1. Tactical Optimization
 	        
         //Random Swapping Optimization
-	        List<Node> randomTour = Christofides.randomSwapOptimise(hamiltonCycle, 10);
+	        List<Node> randomTour = Christofides.randomSwapping(hamiltonCycle);
 	        System.out.println("TSP Random Swap Tour Optimisation :" + randomTour.size()); //Printing the size of random tour list
 	        System.out.println("Random Tour Length :" + Christofides.calculateTourLength(randomTour));
 	        
 	    //Two Optimization
 	        List<Node> twoOptTour = Christofides.twoOpt(randomTour);
 	        System.out.println("TSP Two Opt Tour Optimisation Size: " + twoOptTour.size());
-	        System.out.println("OTL 2 Opt Tour Length : " + Christofides.calculateTourLength(twoOptTour));
+	        System.out.println("TSP 2 Opt Tour Length : " + Christofides.calculateTourLength(twoOptTour));
 	    
 	    //2. Strategic Optimization
 	        
@@ -60,52 +238,98 @@ public class App {
 	        List<Node> simulatedAnnealing = Christofides.generateSimulatedAnnealingTSPtour(eulerTour);
 	        System.out.println("TSP SimulatedAnnealing Size :" + simulatedAnnealing.size());
 	        System.out.println("Simulated Annealing Hamilton Tour Length :" + Christofides.calculateTourLength(simulatedAnnealing));
-	        System.out.println("TSP Genetic Opt :");
 	       
-	        
-//	       List<Vertex> tourVertex = convertNodeListToVertexList(hamiltonCycle);
-//
-//	       List<String> tour = hamiltonCycle.stream().map(vertex -> vertex.getCrimeId()).collect(Collectors.toList());
-//	        benchmark.startMark();
-//	        List<Integer> aopIdTsp = AntColonyOptimization.optimizeWithAntColony(tour,hamiltonCycle);
-//	        benchmark.endMark();
-//
-//	        List<Vertex> aopTsp = new ArrayList<>();
-//	        double aopCost = 0;
-//	        for (int i = 0; i < aopIdTsp.size() - 1; i++) {
-//	            Vertex v1 = convertNodeListToVertexList(hamiltonCycle.get(aopIdTsp.get(i)));
-//	            Vertex v2 = hamiltonCycle.get(aopIdTsp.get(i+1));
-//	            Edge edge = new Edge(v1, v2);
-//	            aopCost += edge.getWeight();
-//	            aopTsp.add(v1);
-//	        }
-//	        aopTsp.add(tsp.get(aopIdTsp.get(aopIdTsp.size() - 1)));
-//	        
-//	        
-//	        List<Integer> tour = convertNodeListToIndexList(hamiltonCycle);
-	       
-	        //System.out.println("Simulated Annealing Hamilton Tour Length :" + AntColonyOptimization.optimizeWithAntColony(tour, tourVertex)); 
-	       
-        System.out.println("Execution done");
-        
-    }
-    public static List<Vertex> convertNodeListToVertexList(List<Node> nodes) {
-        List<Vertex> vertices = new ArrayList<>();
-        for (Node node : nodes) {
-            Vertex vertex = new Vertex(node.getCrimeId(), node.getLatitude(), node.getLongitude());
-            vertices.add(vertex);
-        }
-        return vertices;
-    }
-
+	   
+	        System.out.println("Ant Colony Optimization Execution: ");
     
-    public static List<Integer> convertNodeListToIndexList(List<Node> nodes) {
-        List<Integer> indices = new ArrayList<>();
-        for (Node node : nodes) {
-            indices.add(node.getIndex());
-        }
-        return indices;
     }
+    // Ant Colony Optimization
+    	
+	public static int numUnvisited(Tour tr, Town[] candidates) {
+		int count = 0;
+		int len = candidates.length;
+		for (int i = 0; i < len; i++) {
+			if (!tr.visited(candidates[i])) {
+				count++;
+			}
+		}
+		return count;
+	}
+
+	public static Town[] getUnvisited(Tour tr, Town[] candidates) {
+		Town[] t = new Town[numUnvisited(tr, candidates)];
+		for (int i = 0, j = 0; i < candidates.length; i++) {
+			if (!tr.visited(candidates[i])) {
+				t[j] = candidates[i];
+				j++;
+			}
+		}
+		return t;
+	}
+
+	public static void applyPheromone(Town from, Town to) {
+		final int OFFSET = 1;
+		double old = pheromone[from.id - OFFSET][to.id - OFFSET];
+		double newPheromone = (1 - PO) * old + (PO * TAU_0);
+		pheromone[from.id - OFFSET][to.id - OFFSET] = newPheromone;
+		pheromone[to.id - OFFSET][from.id - OFFSET] = newPheromone;
+	}
+
+	public static int maxArg(Town[] candidateList, Town i) {
+		int len = candidateList.length;
+		double maxArg = -10.0;
+		int maxIndex = -1;
+		for (int j = 0; j < len; j++) {
+			double arg = ph(i, candidateList[j]);
+			if (arg > maxArg) {
+				maxArg = arg;
+				maxIndex = j;
+			}
+		}
+		return maxIndex;
+	}
+
+	public static double summation(Town[] candidateList, Town i) {
+		int len = candidateList.length;
+		double sum = 0.0;
+		for (int j = 0; j < len; j++) {
+			sum += ph(i, candidateList[j]);
+		}
+		return sum;
+	}
+
+	public static double ph(Town i, Town u) {
+		double pheromoneValue = pheromone[i.id - 1][u.id - 1];
+		double distanceInverse = 1.0 / adjacencyMatrix[i.id - 1][u.id - 1];
+		return pheromoneValue * Math.pow(distanceInverse, BETA);
+	}
+
+	private static final int POT_SIZE = 1000;
+
+	public static int probability(Town[] candidateList, Town i) {
+		int[] pot = new int[POT_SIZE];
+		double summation = summation(candidateList, i);
+		int start = 0;
+
+		for (int j = 0; j < candidateList.length; j++) {
+			double p = ph(i, candidateList[j]) / summation;
+			int add = (int) (POT_SIZE * p);
+
+			if (add > 0 && start < POT_SIZE) {
+				for (int k = 0; k < add && start < POT_SIZE; k++) {
+					pot[start] = j;
+					start++;
+				}
+			}
+		}
+
+		int r = (int) (Math.random() * POT_SIZE);
+		return pot[r];
+	}
+    
+    
+    
+    
 
     public static Graph getNodesFromCSV() {
         Graph graph = new Graph();

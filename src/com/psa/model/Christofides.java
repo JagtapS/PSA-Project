@@ -17,34 +17,6 @@ public class Christofides {
     public static List<Edge> findMST(Graph graph) {
         return graph.kruskalMST();
     }
-    
-//    public static double tourLength(int n, double[][] distance, List<Integer> tour ) {
-//    	double length = 0.0;
-//    	for (int i=0; i< n; i++) {
-//    		int j = (i+1) % n;
-//    		length += distance[tour.get(i)][tour.get(j)];
-//    	}
-//    	return length;
-//    }
-//    
-//    public static double calculateDistance(int n, List<Edge> tour) {
-//    	//Haversine formula
-//        int R = 6371; // constant value for the radius of the Earth in kilometers
-//        //converted from degrees to radians using the Math.toRadians() method
-////        double lat1 = Math.toRadians(source.getLatitude()); //source latitude
-////        double lat2 = Math.toRadians(destination.getLatitude()); //destination latitude
-////        double lon1 = Math.toRadians(source.getLongitude()); //source longitude
-////        double lon2 = Math.toRadians(destination.getLongitude()); //destination longitude
-//        double dist = tour.get(i)
-//        double dLat = lat2 - lat1; 
-//        double dLon = lon2 - lon1;
-//        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-//                Math.cos(lat1) * Math.cos(lat2) *
-//                        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-//        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-//        double distance = R * c * 1000;
-//        return distance; //in meters
-//    }
 
     /*
      * code to compute the degree of each vertex in a graph by iterating through the edges in its minimum spanning tree 
@@ -139,75 +111,90 @@ public class Christofides {
         return simulatedAnnealingOptimise(hamiltonList, 10000.0, 0.999, 10000);
     }
     
+    public static List<Node> randomSwapping(List<Node> hamiltonCycle) {
+        double originalLength = calculateTourLength(hamiltonCycle);
+        List<Node> optimizedHamiltonCycle = new ArrayList<>(hamiltonCycle);
 
-    public static List<Node> randomSwapOptimise(List<Node> tspTour, Integer iterations) {
-    	//initializing randomSwapTour to input tspTour
-        List<Node> randomSwapTour = tspTour;
-        // calculating randomSwapTour length as currMaxTourLength
-        double currMaxTourLength = calculateTourLength(randomSwapTour);
-        for (int i = 0; i < iterations; i++) {
-        	//Each iteration generates two random indices within the range of the tour size using Math.random()
-            int randomIndexOne = (int) (Math.random() * tspTour.size());
-            int randomIndexTwo = (int) (Math.random() * tspTour.size());
-            //Creating a deepCopy and adding to SwappedTour
-            List<Node> swappedTour = DeepCopyUtil.deepCopy(randomSwapTour);
-            //Swap the two random nodes
-            swap(swappedTour, randomIndexOne, randomIndexTwo);
-            double swappedTourLength = calculateTourLength(swappedTour);
-            if (swappedTourLength < currMaxTourLength) {
-            	//Updating currMaxTourLength to swappedTourLength
-                currMaxTourLength = swappedTourLength;
-                //updating randomSwapTour to be the swappedTour
-                randomSwapTour = DeepCopyUtil.deepCopy(swappedTour);
+        int n = hamiltonCycle.size();
+        int maxIterations = 1000;
+
+        for (int i = 0; i < maxIterations; i++) {
+            int a = (int) (Math.random() * (n - 1));
+            int b = (int) (Math.random() * (n - 1));
+
+            if (a == b) {
+                continue;
+            }
+
+            if (a > b) {
+                int temp = a;
+                a = b;
+                b = temp;
+            }
+
+            List<Node> newHamiltonCycle = new ArrayList<>(optimizedHamiltonCycle);
+
+            // Reverse the sub-tour from index a to index b
+            for (int j = a, k = b; j < k; j++, k--) {
+                Node temp = newHamiltonCycle.get(j);
+                newHamiltonCycle.set(j, newHamiltonCycle.get(k));
+                newHamiltonCycle.set(k, temp);
+            }
+
+            double newLength = calculateTourLength(newHamiltonCycle);
+
+            // If the new Hamilton cycle is shorter than the original Hamilton cycle,
+            // then update the optimized Hamilton cycle
+            if (newLength < originalLength) {
+                optimizedHamiltonCycle = newHamiltonCycle;
+                originalLength = newLength;
+                i = 0; // Reset the iteration count
             }
         }
-        return randomSwapTour; //Returning Random Swap Tour list
+
+        return optimizedHamiltonCycle;
     }
 
     public static List<Node> twoOpt(List<Node> tour) {
-        List<Node> twoOptTour = new ArrayList<>(tour);
-        double length = calculateTourLength(twoOptTour);
-        int n = twoOptTour.size();
+        List<Node> newTour = new ArrayList<>(tour);
+        int size = newTour.size();
 
-        for (int i = 0; i < n - 1; i++) {
-            for (int j = i + 1; j < n; j++) {
-                Node u = twoOptTour.get(i);
-                Node v = twoOptTour.get((i + 1) % n);
-                Node x = twoOptTour.get(j);
-                Node y = twoOptTour.get((j + 1) % n);
-
-                // Compute the lengths of the two possible new twoOptTours.
-                double newLength1 = length - Graph.calculateDistance(u, v) - Graph.calculateDistance(x, y)
-                        + Graph.calculateDistance(u, x) + Graph.calculateDistance(v, y);
-                double newLength2 = length - Graph.calculateDistance(u, v) - Graph.calculateDistance(x, y)
-                        + Graph.calculateDistance(u, y) + Graph.calculateDistance(v, x);
-
-                // If either of the new twoOptTours is shorter, accept it as the new TSP
-                // twoOptTour.
-                if (newLength1 < length || newLength2 < length) {
-                    List<Node> newTour = new ArrayList<>();
-
-                    for (int k = 0; k <= i; k++) {
-                        newTour.add(twoOptTour.get(k));
-                    }
-
-                    for (int k = j; k >= i + 1; k--) {
-                        newTour.add(twoOptTour.get(k));
-                    }
-
-                    for (int k = j + 1; k < n; k++) {
-                        newTour.add(twoOptTour.get(k));
-                    }
-
-                    // Update the length of the new twoOptTour.
-                    length = (newLength1 < newLength2) ? newLength1 : newLength2;
-                    tour = new ArrayList<>(newTour);
+        for (int i = 0; i < size - 1; i++) {
+            for (int j = i + 1; j < size; j++) {
+                if (j - i == 1) continue;
+                List<Node> reversedNodes = reverseNodes(newTour, i, j);
+                if (getTourLength(reversedNodes) < getTourLength(newTour)) {
+                    newTour = reversedNodes;
                 }
             }
         }
 
-        return tour;
+        return newTour;
     }
+
+    private static List<Node> reverseNodes(List<Node> tour, int i, int j) {
+        List<Node> reversedNodes = new ArrayList<>(tour.subList(0, i));
+        List<Node> reversedSegment = new ArrayList<>(tour.subList(i, j + 1));
+        Collections.reverse(reversedSegment);
+        reversedNodes.addAll(reversedSegment);
+        reversedNodes.addAll(tour.subList(j + 1, tour.size()));
+        return reversedNodes;
+    }
+
+    private static double getTourLength(List<Node> tour) {
+        double length = 0;
+        for (int i = 0; i < tour.size() - 1; i++) {
+            Node a = tour.get(i);
+            Node b = tour.get(i + 1);
+            length += Graph.calculateDistance(a, b);
+        }
+        length += Graph.calculateDistance(tour.get(tour.size() - 1), tour.get(0));
+        return length;
+    }
+
+
+
+
 
     //simulatedAnnealing Optimization
     public static List<Node> simulatedAnnealingOptimise(List<Node> tspTour, double initialTemp, double coolingRate, int stoppingCriterion) {
@@ -239,6 +226,9 @@ public class Christofides {
 
         return currentTour;
     }
+    
+
+
     
     private static void dfs(Node node, List<Node> eulerTour, List<Edge> edges, Set<Node> visited,
             Map<Node, List<Node>> adjacenyMatrix) {
